@@ -81,7 +81,7 @@ class TraccarClient:
         Send vehicle location to Traccar using OsmAnd protocol.
         
         Args:
-            device_id: Device unique ID (or identifier)
+            device_id: Device unique ID (Smartcar vehicle ID)
             latitude: Vehicle latitude
             longitude: Vehicle longitude
             accuracy: Location accuracy in meters (optional)
@@ -109,40 +109,26 @@ class TraccarClient:
                     logger.error(f"Failed to create device: {msg}")
                     return False, f"Could not create device: {msg}"
             
-            # Use current time if not provided (in milliseconds for Traccar)
+            # Use current time if not provided (in seconds for OsmAnd)
             if timestamp is None:
-                timestamp_ms = int(time.time() * 1000)
-            else:
-                timestamp_ms = int(timestamp * 1000) if timestamp < 100000000000 else int(timestamp)
+                timestamp = int(time.time())
             
-            # Build OsmAnd protocol request
-            # The device should now exist, send location via API
-            url = f"{self.api_url}/api/positions"
+            # Build OsmAnd protocol request to example.com
+            # OsmAnd protocol: GET /?id={uniqueId}&lat={lat}&lon={lon}&timestamp={timestamp}...
+            url = f"{self.base_url}/?id={device_id}&lat={latitude}&lon={longitude}&timestamp={timestamp}"
             
-            # Get device ID from uniqueId
-            devices = self.get_devices()
-            device = next((d for d in devices if d.get('uniqueId') == device_id), None)
+            # Add optional parameters if provided
+            if accuracy is not None:
+                url += f"&accuracy={accuracy}"
+            if altitude is not None:
+                url += f"&altitude={altitude}"
+            if speed is not None:
+                url += f"&speed={speed}"
+            if course is not None:
+                url += f"&course={course}"
             
-            if not device:
-                return False, "Device not found after creation"
-            
-            device_pk = device.get('id')
-            
-            # Send position data via API
-            position_data = {
-                'deviceId': device_pk,
-                'latitude': float(latitude),
-                'longitude': float(longitude),
-                'altitude': altitude or 0,
-                'speed': speed or 0,
-                'course': course or 0,
-                'accuracy': accuracy or 0,
-                'fixTime': timestamp_ms,
-                'serverTime': int(time.time() * 1000),
-                'valid': True
-            }
-            
-            response = self.session.post(url, json=position_data, timeout=10)
+            logger.debug(f"Sending to Traccar OsmAnd: {url}")
+            response = self.session.get(url, timeout=10)
             
             if response.status_code == 200:
                 logger.info(f"✓ Sent location for device {device_id}: {latitude}, {longitude}")
