@@ -81,7 +81,7 @@ class TraccarClient:
         Send vehicle location to Traccar using OsmAnd protocol.
         
         Args:
-            device_id: Traccar device ID (or unique identifier)
+            device_id: Device unique ID (or identifier)
             latitude: Vehicle latitude
             longitude: Vehicle longitude
             accuracy: Location accuracy in meters (optional)
@@ -98,12 +98,15 @@ class TraccarClient:
             return False, "Not authenticated"
         
         try:
-            # Use current time if not provided
+            # Use current time if not provided (in milliseconds for Traccar)
             if timestamp is None:
-                timestamp = int(time.time())
+                timestamp_ms = int(time.time() * 1000)
+            else:
+                timestamp_ms = int(timestamp * 1000) if timestamp < 100000000000 else int(timestamp)
             
-            # Build OsmAnd protocol URL
-            url = f"{self.base_url}/?id={device_id}&lat={latitude}&lon={longitude}&timestamp={timestamp}"
+            # Build OsmAnd protocol request
+            # OsmAnd protocol expects: /api/location?id={uniqueId}&lat={lat}&lon={lon}&timestamp={ts}
+            url = f"{self.base_url}/api/location?id={device_id}&lat={latitude}&lon={longitude}&timestamp={timestamp_ms}"
             
             # Add optional parameters if provided
             if accuracy is not None:
@@ -115,6 +118,7 @@ class TraccarClient:
             if course is not None:
                 url += f"&course={course}"
             
+            logger.debug(f"Sending to Traccar: {url}")
             response = self.session.get(url, timeout=10)
             
             if response.status_code == 200:
@@ -122,6 +126,7 @@ class TraccarClient:
                 return True, "Location updated"
             else:
                 logger.error(f"❌ Traccar error {response.status_code} for device {device_id}")
+                logger.error(f"   Response: {response.text}")
                 return False, f"HTTP {response.status_code}"
                 
         except Exception as e:
