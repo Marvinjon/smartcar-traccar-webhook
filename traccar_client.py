@@ -39,14 +39,10 @@ class TraccarClient:
         """
         try:
             login_url = f"{self.api_url}/api/session"
-            headers = {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            }
+            # Traccar expects form data, not JSON
             response = self.session.post(
                 login_url,
-                headers=headers,
-                json={
+                data={
                     'email': self.username,
                     'password': self.password
                 }
