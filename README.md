@@ -368,8 +368,44 @@ Always return 200 OK immediately:
 }
 ```
 
+## Production Deployment
+
+For production deployment to Ubuntu servers with Nginx, SSL, and systemd:
+
+**→ See [DEPLOYMENT.md](DEPLOYMENT.md) for complete setup guide**
+
+### Quick Deployment
+
+```bash
+# 1. Run deployment script
+bash deploy.sh
+
+# 2. Edit systemd service file with your paths
+sudo nano /etc/systemd/system/smartcar-webhook.service
+
+# 3. Start service
+sudo systemctl enable smartcar-webhook
+sudo systemctl start smartcar-webhook
+
+# 4. Check status
+sudo systemctl status smartcar-webhook
+```
+
+### Key Production Features
+
+- ✓ Gunicorn WSGI server (4 workers by default)
+- ✓ Nginx reverse proxy with SSL/TLS
+- ✓ Systemd auto-start and restart
+- ✓ Structured logging to files
+- ✓ Health check endpoint
+- ✓ Environment variable validation
+- ✓ Webhook signature verification
+- ✓ Event deduplication
+
 ## Support
 
 For Smartcar API issues: https://smartcar.com/docs
 For webhook debugging: Check Smartcar Dashboard → Webhooks → Logs
 For Traccar issues: Check Traccar server logs
+For deployment help: See DEPLOYMENT.md
+

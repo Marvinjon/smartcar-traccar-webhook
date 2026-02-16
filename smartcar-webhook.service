@@ -1,0 +1,23 @@
+[Unit]
+Description=Smartcar Webhook Server
+After=network.target
+
+[Service]
+Type=notify
+User=www-data
+WorkingDirectory=/opt/smartcar-traccar-webhook
+Environment="PATH=/opt/smartcar-traccar-webhook/venv/bin"
+EnvironmentFile=/opt/smartcar-traccar-webhook/.env
+ExecStart=/opt/smartcar-traccar-webhook/venv/bin/gunicorn \
+    --workers 4 \
+    --worker-class sync \
+    --bind 0.0.0.0:5000 \
+    --timeout 30 \
+    --access-logfile /var/log/smartcar-webhook/access.log \
+    --error-logfile /var/log/smartcar-webhook/error.log \
+    wsgi:app
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

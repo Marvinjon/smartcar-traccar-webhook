@@ -176,30 +176,37 @@ if __name__ == '__main__':
     port = int(os.getenv('WEBHOOK_PORT', '5000'))
     debug = os.getenv('WEBHOOK_DEBUG', 'false').lower() == 'true'
     
-    print(f"""
+    # Check for required environment variables
+    required_vars = ['SMARTCAR_WEBHOOK_SECRET', 'TRACCAR_API_URL', 'TRACCAR_USERNAME', 'TRACCAR_PASSWORD']
+    missing_vars = [var for var in required_vars if not os.getenv(var)]
+    
+    if missing_vars:
+        print(f"❌ ERROR: Missing required environment variables: {', '.join(missing_vars)}")
+        print("Please set these in your .env file")
+        sys.exit(1)
+    
+    if debug:
+        print("""
 ╔════════════════════════════════════════════════════════════════╗
-║         Smartcar Webhook Server Running                       ║
+║         Smartcar Webhook Server Running (DEBUG MODE)          ║
+╠════════════════════════════════════════════════════════════════╣
+║ ⚠️  WARNING: Debug mode is ON - NOT suitable for production   ║
+╚════════════════════════════════════════════════════════════════╝
+        """)
+    else:
+        print("""
+╔════════════════════════════════════════════════════════════════╗
+║         Smartcar Webhook Server Running (PRODUCTION)          ║
 ╠════════════════════════════════════════════════════════════════╣
 ║ Server: http://{host}:{port}                                    
 ║ Webhook endpoint: POST /webhooks/smartcar                      
 ║ Health check: GET /webhooks/health                             
 ║ Statistics: GET /webhooks/stats                                
 ╚════════════════════════════════════════════════════════════════╝
-
-⚠️  Important Setup Steps:
-1. Ensure this server is accessible from the internet (public IP/domain)
-2. Configure HTTPS with a valid SSL certificate
-3. Get webhook secret from Smartcar Dashboard
-4. Set SMARTCAR_WEBHOOK_SECRET in .env
-5. Register webhook in Dashboard: https://your-domain.com/webhooks/smartcar
-6. Subscribe to VEHICLE_STATE events with these signals:
-   - Location.Latitude
-   - Location.Longitude
-   - Odometer.Odometer
-    """)
+        """.format(host=host, port=port))
     
     if not os.getenv('SMARTCAR_WEBHOOK_SECRET'):
-        print("❌ WARNING: SMARTCAR_WEBHOOK_SECRET not set in .env")
+        print("❌ WARNING: SMARTCAR_WEBHOOK_SECRET not set")
         print("   Webhook signature validation will FAIL\n")
     
     app.run(host=host, port=port, debug=debug)
