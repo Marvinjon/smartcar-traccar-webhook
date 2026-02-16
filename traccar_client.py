@@ -1,17 +1,20 @@
 """
 Traccar GPS tracking server client.
 
-Sends vehicle location updates to Traccar.
+Sends vehicle location updates to Traccar using OsmAnd protocol.
 """
 
 import os
 import requests
-from typing import Optional
+import time
+import logging
+from typing import Optional, Tuple
 from dotenv import load_dotenv
 from pathlib import Path
 
 # Load environment
 load_dotenv(Path(__file__).parent / '.env')
+logger = logging.getLogger(__name__)
 
 
 class TraccarClient:
@@ -20,6 +23,7 @@ class TraccarClient:
     def __init__(self):
         """Initialize Traccar client with configuration from environment."""
         self.api_url = os.getenv('TRACCAR_API_URL')
+        self.base_url = os.getenv('TRACCAR_BASE_URL', self.api_url)  # For OsmAnd protocol
         self.username = os.getenv('TRACCAR_USERNAME')
         self.password = os.getenv('TRACCAR_PASSWORD')
         self.authenticated = False
@@ -28,7 +32,7 @@ class TraccarClient:
         if self.api_url and self.username and self.password:
             self._authenticate()
         else:
-            print("⚠️  Traccar credentials not configured")
+            logger.warning("⚠️  Traccar credentials not configured")
     
     def _authenticate(self) -> bool:
         """
@@ -50,16 +54,16 @@ class TraccarClient:
             
             if response.status_code == 200:
                 self.authenticated = True
-                print(f"✓ Authenticated with Traccar: {self.api_url}")
+                logger.info(f"✓ Authenticated with Traccar: {self.api_url}")
                 return True
             else:
-                print(f"❌ Traccar authentication failed: {response.status_code}")
-                print(f"   URL: {login_url}")
-                print(f"   Response: {response.text}")
+                logger.error(f"❌ Traccar authentication failed: {response.status_code}")
+                logger.error(f"   URL: {login_url}")
+                logger.error(f"   Response: {response.text}")
                 return False
                 
         except Exception as e:
-            print(f"❌ Traccar connection error: {e}")
+            logger.error(f"❌ Traccar connection error: {e}")
             return False
     
     def send_location(
@@ -70,121 +74,128 @@ class TraccarClient:
         accuracy: Optional[float] = None,
         altitude: Optional[float] = None,
         speed: Optional[float] = None,
-        course: Optional[float] = None
-    ) -> bool:
+        course: Optional[float] = None,
+        timestamp: Optional[int] = None
+    ) -> Tuple[bool, str]:
         """
-        Send location update to Traccar.
+        Send vehicle location to Traccar using OsmAnd protocol.
         
         Args:
-            device_id: Traccar device ID (or Smartcar vehicle ID)
+            device_id: Traccar device ID (or unique identifier)
             latitude: Vehicle latitude
             longitude: Vehicle longitude
             accuracy: Location accuracy in meters (optional)
             altitude: Altitude in meters (optional)
             speed: Speed in km/h (optional)
             course: Bearing/heading in degrees (optional)
+            timestamp: Unix timestamp in seconds (optional, defaults to now)
             
         Returns:
-            True if successfully sent
+            Tuple of (success: bool, message: str)
         """
         if not self.authenticated:
-            print(f"⚠️  Not authenticated with Traccar, skipping location update")
-            return False
+            logger.warning(f"⚠️  Not authenticated with Traccar, skipping location update for {device_id}")
+            return False, "Not authenticated"
         
         try:
-            # Get or create device
-            device = self._get_or_create_device(device_id)
-            if not device:
-                print(f"❌ Could not get/create device {device_id}")
-                return False
+            # Use current time if not provided
+            if timestamp is None:
+                timestamp = int(time.time())
             
-            device_pk = device.get('id')
+            # Build OsmAnd protocol URL
+            url = f"{self.base_url}/?id={device_id}&lat={latitude}&lon={longitude}&timestamp={timestamp}"
             
-            # Send position data via Traccar API
-            position_url = f"{self.api_url}/api/positions"
-            position_data = {
-                'deviceId': device_pk,
-                'serverTime': int(__import__('time').time() * 1000),
-                'deviceTime': int(__import__('time').time() * 1000),
-                'fixTime': int(__import__('time').time() * 1000),
-                'valid': True,
-                'latitude': float(latitude),
-                'longitude': float(longitude),
-                'altitude': altitude or 0,
-                'speed': speed or 0,
-                'course': course or 0,
-                'accuracy': accuracy or 0
-            }
+            # Add optional parameters if provided
+            if accuracy is not None:
+                url += f"&accuracy={accuracy}"
+            if altitude is not None:
+                url += f"&altitude={altitude}"
+            if speed is not None:
+                url += f"&speed={speed}"
+            if course is not None:
+                url += f"&course={course}"
             
-            response = self.session.post(position_url, json=position_data)
+            response = self.session.get(url, timeout=10)
             
             if response.status_code == 200:
-                return True
+                logger.info(f"✓ Sent location for device {device_id}: {latitude}, {longitude}")
+                return True, "Location updated"
             else:
-                print(f"⚠️  Traccar position update failed: {response.status_code}")
-                print(f"   Response: {response.text}")
-                return False
+                logger.error(f"❌ Traccar error {response.status_code} for device {device_id}")
+                return False, f"HTTP {response.status_code}"
                 
         except Exception as e:
-            print(f"❌ Error sending location to Traccar: {e}")
-            return False
+            logger.error(f"❌ Error sending location to Traccar for device {device_id}: {e}")
+            return False, str(e)
     
-    def _get_or_create_device(self, device_id: str) -> Optional[dict]:
+    def get_devices(self):
         """
-        Get device from Traccar or create if it doesn't exist.
+        Get list of all devices from Traccar API.
+        Requires authentication.
         
-        Args:
-            device_id: Vehicle ID (usually Smartcar vehicle ID)
-            
         Returns:
-            Device dict with 'id' and 'name' keys, or None
+            List of device dictionaries
         """
+        if not self.authenticated:
+            logger.warning("Not authenticated with Traccar - cannot fetch devices")
+            return []
+        
         try:
-            # Try to get device by name
-            devices_url = f"{self.api_url}/api/devices"
-            response = self.session.get(devices_url)
+            url = f"{self.api_url}/api/devices"
+            response = self.session.get(url, timeout=10)
             
             if response.status_code == 200:
                 devices = response.json()
-                for device in devices:
-                    if device.get('uniqueId') == device_id or device.get('name') == device_id:
-                        return device
-            
-            # Device not found, try to create it
-            return self._create_device(device_id)
-            
-        except Exception as e:
-            print(f"⚠️  Could not get device {device_id}: {e}")
-            return None
-    
-    def _create_device(self, device_id: str) -> Optional[dict]:
-        """
-        Create a new device in Traccar.
-        
-        Args:
-            device_id: Vehicle ID
-            
-        Returns:
-            Created device dict, or None
-        """
-        try:
-            devices_url = f"{self.api_url}/api/devices"
-            device_data = {
-                'name': f"Vehicle {device_id}",
-                'uniqueId': device_id,
-                'status': 'online'
-            }
-            
-            response = self.session.post(devices_url, json=device_data)
-            
-            if response.status_code == 200:
-                device = response.json()
-                print(f"✓ Created Traccar device: {device.get('name')} ({device.get('id')})")
-                return device
+                logger.info(f"Retrieved {len(devices)} devices from Traccar")
+                return devices
             else:
-                print(f"⚠️  Failed to create device in Traccar: {response.status_code}")
-                return None
+                logger.error(f"Error fetching devices: {response.status_code}")
+                return []
                 
         except Exception as e:
-            print(f"⚠️  Error creating device in Traccar: {e}")
-            return None
+            logger.error(f"Error fetching devices from Traccar: {e}")
+            return []
+    
+    def create_device(self, device_id: str, name: str, unique_id: Optional[str] = None) -> Tuple[bool, str, Optional[int]]:
+        """
+        Create a new device in Traccar.
+        Requires authentication.
+        
+        Args:
+            device_id: Unique identifier for the device (e.g., Smartcar vehicle ID)
+            name: Human-readable name for the device
+            unique_id: Optional unique ID (defaults to device_id if not provided)
+            
+        Returns:
+            Tuple of (success: bool, message: str, traccar_device_id: int or None)
+        """
+        if not self.authenticated:
+            logger.warning("Not authenticated - cannot create device")
+            return False, "Not authenticated with Traccar", None
+        
+        try:
+            url = f"{self.api_url}/api/devices"
+            
+            payload = {
+                'name': name,
+                'uniqueId': unique_id or device_id,
+                'category': 'car',
+            }
+            
+            response = self.session.post(url, json=payload, timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                traccar_id = result.get('id')
+                logger.info(f"✓ Created device '{name}' in Traccar (ID: {traccar_id})")
+                return True, f"Created device {name}", traccar_id
+            elif response.status_code == 409:
+                logger.warning(f"Device {name} already exists in Traccar")
+                return False, "Device already exists", None
+            else:
+                logger.error(f"Error creating device: {response.status_code}")
+                return False, str(response.text), None
+                
+        except Exception as e:
+            logger.error(f"Error creating device {name}: {e}")
+            return False, str(e), None

@@ -124,17 +124,21 @@ class WebhookProcessor:
             
             # Update Traccar
             try:
-                self.traccar.send_location(
+                success, message = self.traccar.send_location(
                     device_id=vehicle_id,
                     latitude=latitude,
                     longitude=longitude,
                     accuracy=None
                 )
-                print(f"✓ Updated vehicle {vehicle_id}: {latitude}, {longitude} ({odometer_km:.1f} km)")
                 
-                # Mark as processed only after successful update
-                self.mark_processed(event_id)
-                return True
+                if success:
+                    print(f"✓ Updated vehicle {vehicle_id}: {latitude}, {longitude} ({odometer_km:.1f} km)")
+                    # Mark as processed only after successful update
+                    self.mark_processed(event_id)
+                    return True
+                else:
+                    print(f"⚠️  Failed to update vehicle {vehicle_id}: {message}")
+                    return False
                 
             except Exception as e:
                 print(f"❌ Failed to update vehicle {vehicle_id}: {e}")
