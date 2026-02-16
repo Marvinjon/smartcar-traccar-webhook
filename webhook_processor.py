@@ -64,22 +64,31 @@ class WebhookProcessor:
             self.processed_events.add(event_id)
             self._save_processed_events()
     
-    def extract_location(self, signals: dict) -> Optional[tuple]:
+    def extract_location(self, signals: list) -> Optional[tuple]:
         """
-        Extract latitude and longitude from signals.
+        Extract latitude and longitude from signals list.
         
         Args:
-            signals: Signal dict from webhook payload
+            signals: Signals list from webhook payload
             
         Returns:
             Tuple of (latitude, longitude, odometer_m) or None
         """
         try:
-            # Location signals from Smartcar API
-            location = signals.get('Location.Latitude', {}).get('value')
-            latitude = signals.get('Location.Latitude', {}).get('value')
-            longitude = signals.get('Location.Longitude', {}).get('value')
-            odometer_m = signals.get('Odometer.Odometer', {}).get('value')
+            latitude = None
+            longitude = None
+            odometer_m = None
+            
+            # signals is a list of signal objects
+            for signal in signals:
+                group = signal.get('group', '')
+                body = signal.get('body', {})
+                
+                if group == 'Location':
+                    latitude = body.get('latitude')
+                    longitude = body.get('longitude')
+                elif group == 'Odometer':
+                    odometer_m = body.get('value')
             
             if latitude is not None and longitude is not None:
                 return float(latitude), float(longitude), odometer_m
