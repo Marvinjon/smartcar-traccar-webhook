@@ -39,8 +39,13 @@ class TraccarClient:
         """
         try:
             login_url = f"{self.api_url}/api/session"
+            headers = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
             response = self.session.post(
                 login_url,
+                headers=headers,
                 json={
                     'email': self.username,
                     'password': self.password
@@ -54,6 +59,7 @@ class TraccarClient:
             else:
                 print(f"❌ Traccar authentication failed: {response.status_code}")
                 print(f"   URL: {login_url}")
+                print(f"   Response: {response.text}")
                 return False
                 
         except Exception as e:
