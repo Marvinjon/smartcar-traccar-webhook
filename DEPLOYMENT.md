@@ -91,8 +91,7 @@ sudo chown www-data:www-data /var/log/smartcar-webhook
 
 ```bash
 sudo cp smartcar-webhook.service /etc/systemd/system/
-sudo nano /etc/systemd/system/smartcar-webhook.service
-```
+sudo nano /etc/systemd/system/smartcar-webhook.service```
 
 **Update these paths to match your setup:**
 - `WorkingDirectory` - Path to your project
