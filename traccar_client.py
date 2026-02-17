@@ -75,7 +75,8 @@ class TraccarClient:
         altitude: Optional[float] = None,
         speed: Optional[float] = None,
         course: Optional[float] = None,
-        timestamp: Optional[int] = None
+        timestamp: Optional[int] = None,
+        odometer_km: Optional[float] = None
     ) -> Tuple[bool, str]:
         """
         Send vehicle location to Traccar using OsmAnd protocol.
@@ -89,6 +90,7 @@ class TraccarClient:
             speed: Speed in km/h (optional)
             course: Bearing/heading in degrees (optional)
             timestamp: Unix timestamp in seconds (optional, defaults to now)
+            odometer_km: Odometer reading in kilometers (optional)
             
         Returns:
             Tuple of (success: bool, message: str)
@@ -126,6 +128,9 @@ class TraccarClient:
                 url += f"&speed={speed}"
             if course is not None:
                 url += f"&course={course}"
+            if odometer_km is not None:
+                # Convert km to meters for OsmAnd protocol
+                url += f"&odometer={int(odometer_km * 1000)}"
             
             logger.debug(f"Sending to Traccar OsmAnd: {url}")
             response = self.session.get(url, timeout=10)

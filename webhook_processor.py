@@ -66,32 +66,45 @@ class WebhookProcessor:
     
     def extract_location(self, signals: list) -> Optional[tuple]:
         """
-        Extract latitude and longitude from signals list.
+        Extract latitude, longitude, odometer, and timestamp from signals list.
         
         Args:
             signals: Signals list from webhook payload
             
         Returns:
-            Tuple of (latitude, longitude, odometer_m) or None
+            Tuple of (latitude, longitude, odometer_km, timestamp_unix) or None
         """
         try:
             latitude = None
             longitude = None
-            odometer_m = None
+            odometer_km = None
+            timestamp = None
             
             # signals is a list of signal objects
             for signal in signals:
                 group = signal.get('group', '')
                 body = signal.get('body', {})
+                meta = signal.get('meta', {})
                 
                 if group == 'Location':
                     latitude = body.get('latitude')
                     longitude = body.get('longitude')
+                    # Get vehicle's actual timestamp (in milliseconds)
+                    oem_updated_at = meta.get('oemUpdatedAt')
+                    if oem_updated_at:
+                        timestamp = int(oem_updated_at / 1000)  # Convert ms to seconds
                 elif group == 'Odometer':
-                    odometer_m = body.get('value')
+                    odometer_value = body.get('value')
+                    unit = body.get('unit', 'm')
+                    # Convert to km if needed
+                    if odometer_value:
+                        if unit == 'km':
+                            odometer_km = float(odometer_value)
+                        else:  # assume meters
+                            odometer_km = float(odometer_value) / 1000
             
             if latitude is not None and longitude is not None:
-                return float(latitude), float(longitude), odometer_m
+                return float(latitude), float(longitude), odometer_km, timestamp
             
             return None
         except (KeyError, ValueError, TypeError) as e:
@@ -128,8 +141,7 @@ class WebhookProcessor:
                 self.mark_processed(event_id)
                 return True
             
-            latitude, longitude, odometer_m = location_data
-            odometer_km = (odometer_m / 1000) if odometer_m else 0
+            latitude, longitude, odometer_km, timestamp = location_data
             
             # Update Traccar
             try:
@@ -137,11 +149,15 @@ class WebhookProcessor:
                     device_id=vehicle_id,
                     latitude=latitude,
                     longitude=longitude,
-                    accuracy=None
+                    accuracy=None,
+                    timestamp=timestamp,
+                    odometer_km=odometer_km
                 )
                 
                 if success:
-                    print(f"✓ Updated vehicle {vehicle_id}: {latitude}, {longitude} ({odometer_km:.1f} km)")
+                    odo_str = f"{odometer_km:.1f} km" if odometer_km else "no odometer"
+                    ts_str = f"timestamp={timestamp}" if timestamp else "current time"
+                    print(f"✓ Updated vehicle {vehicle_id}: {latitude}, {longitude} ({odo_str}, {ts_str})")
                     # Mark as processed only after successful update
                     self.mark_processed(event_id)
                     return True
