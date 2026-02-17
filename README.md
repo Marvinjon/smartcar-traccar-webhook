@@ -4,16 +4,6 @@ Real-time vehicle location updates using Smartcar's event-driven webhook system.
 
 ## Overview
 
-**Why webhooks instead of polling?**
-
-| Aspect | Polling (Old) | Webhooks (New) |
-|--------|---------------|----------------|
-| **API Calls** | Every 5 min per vehicle | Only on location change |
-| **For 100 vehicles** | ~288 API calls/day | ~10-50 calls/day |
-| **Latency** | ~5 min delay | <5 seconds |
-| **Cost** | Higher (continuous polls) | Lower (event-based) |
-| **Scalability** | Limited (rate limits) | Excellent (event-based) |
-
 ## Architecture
 
 ```
