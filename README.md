@@ -156,7 +156,7 @@ Example:
 
 ## Production Deployment
 
-### Option 1: Systemd (Linux)
+### Systemd (Linux)
 
 Create `/etc/systemd/system/smartcar-webhook.service`:
 ```ini
@@ -182,43 +182,6 @@ sudo systemctl enable smartcar-webhook
 sudo systemctl start smartcar-webhook
 ```
 
-### Option 2: Supervisor
-
-Create `/etc/supervisor/conf.d/smartcar-webhook.conf`:
-```ini
-[program:smartcar-webhook]
-directory=/path/to/smartcar-test
-command=/usr/bin/python3 webhooks/webhook_handler.py
-autostart=true
-autorestart=true
-stderr_logfile=/var/log/smartcar-webhook.err.log
-stdout_logfile=/var/log/smartcar-webhook.out.log
-```
-
-Then:
-```bash
-sudo supervisorctl reread
-sudo supervisorctl update
-```
-
-### Option 3: Docker
-
-Create `Dockerfile`:
-```dockerfile
-FROM python:3.9-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY . .
-EXPOSE 5000
-CMD ["python", "webhooks/webhook_handler.py"]
-```
-
-Build and run:
-```bash
-docker build -t smartcar-webhook .
-docker run -p 5000:5000 --env-file .env smartcar-webhook
-```
 
 ## Monitoring
 
