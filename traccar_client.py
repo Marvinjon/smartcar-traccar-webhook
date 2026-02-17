@@ -119,6 +119,9 @@ class TraccarClient:
             logger.warning(f"⚠️  Not authenticated with Traccar, skipping location update for {device_id}")
             return False, "Not authenticated"
         
+        # Log what we're about to send
+        logger.debug(f"📤 Sending to Traccar - battery_level={battery_level}, battery_range={battery_range}, fuel_level={fuel_level}, low_voltage_battery={low_voltage_battery}, is_charging={is_charging}, vin={vin}")
+        
         try:
             # Ensure device exists - create if needed
             devices = self.get_devices()
@@ -186,6 +189,7 @@ class TraccarClient:
             
             if response.status_code == 200:
                 logger.info(f"✓ Sent location for device {device_id}: {latitude}, {longitude}")
+                logger.debug(f"   Traccar URL: {url}")
                 return True, "Location updated"
             else:
                 logger.error(f"❌ Traccar error {response.status_code} for device {device_id}")
