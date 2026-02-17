@@ -1,18 +1,18 @@
 # Smartcar Webhooks Integration
 
-Real-time vehicle location updates using Smartcar's event-driven webhook system instead of polling.
+Real-time vehicle location updates using Smartcar's event-driven webhook system.
 
 ## Overview
 
-**Why webhooks instead of polling?**
+**Why webhooks?**
 
-| Aspect | Polling (Old) | Webhooks (New) |
-|--------|---------------|----------------|
-| **API Calls** | Every 5 min per vehicle | Only on location change |
-| **For 100 vehicles** | ~288 API calls/day | ~10-50 calls/day |
-| **Latency** | ~5 min delay | <5 seconds |
-| **Cost** | Higher (continuous polls) | Lower (event-based) |
-| **Scalability** | Limited (rate limits) | Excellent (event-based) |
+| Aspect | Webhooks |
+|--------|----------|
+| **API Calls** | Only on location change |
+| **For 100 vehicles** | ~10-50 calls/day |
+| **Latency** | <5 seconds |
+| **Cost** | Lower (event-based) |
+| **Scalability** | Excellent (event-based) |
 
 ## Architecture
 
@@ -135,12 +135,9 @@ WEBHOOK_DEBUG=false            # Enable Flask debug mode
 
 # Smartcar
 SMARTCAR_MANAGEMENT_TOKEN=***  # From Smartcar Dashboard
-SMARTCAR_CLIENT_ID=***         # Keep for fallback polling
-SMARTCAR_CLIENT_SECRET=***     # Keep for fallback polling
-SMARTCAR_REFRESH_TOKEN=***     # Keep for fallback polling
 
 # Traccar (required for location updates)
-TRACCAR_API_URL=http://example.com:5055
+TRACCAR_API_URL=http://example.com
 TRACCAR_USERNAME=admin
 TRACCAR_PASSWORD=***
 ```
@@ -307,17 +304,6 @@ Set up alerts for:
 1. **Check webhook_dedup.json** - Ensure it's being written to
 2. **Check file permissions** - Dedup file must be writable by webhook process
 3. **Monitor eventId** - Watch for same eventId appearing multiple times
-
-## Fallback to Polling
-
-If webhooks fail, the original polling system still works:
-
-```bash
-# Keep running polling as backup
-python main.py  # Runs sync every configured interval
-```
-
-The polling and webhooks can coexist - both update Traccar independently.
 
 ## API Reference
 

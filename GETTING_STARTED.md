@@ -20,8 +20,7 @@ webhooks/
 
 ## Key Features
 
-✅ **Real-time Updates** - Location changes delivered in seconds, not minutes  
-✅ **Lower API Costs** - Event-based instead of continuous polling  
+✅ **Real-time Updates** - Location changes delivered in seconds  
 ✅ **Signature Validation** - HMAC-SHA256 verification for security  
 ✅ **Deduplication** - Prevents duplicate location updates  
 ✅ **Error Handling** - Graceful failure with detailed logging  
@@ -69,40 +68,6 @@ This will:
 python webhooks/webhook_handler.py
 ```
 
-## Webhook vs Polling Comparison
-
-### API Usage
-
-**Polling (5-min interval, 100 vehicles):**
-- 288 API calls/day to Smartcar
-- Continuous server load
-
-**Webhooks:**
-- ~50 API calls/day (only on location change)
-- Event-driven, no polling
-
-### Location Update Latency
-
-**Polling:**
-- Vehicle changes location
-- Wait up to 5 minutes for next poll
-- Update sent 5+ minutes later
-
-**Webhooks:**
-- Vehicle changes location
-- Instantly notified (seconds)
-- Update sent immediately
-
-### Cost
-
-**Polling:**
-- High (proportional to polling frequency)
-- Scales poorly with more vehicles
-
-**Webhooks:**
-- Low (pay-per-event)
-- Scales better for large fleets
-
 ## Configuration
 
 ### Required .env Variables
@@ -116,7 +81,7 @@ WEBHOOK_HOST=0.0.0.0
 WEBHOOK_PORT=5000
 
 # Traccar (unchanged)
-TRACCAR_API_URL=http://example.com:5055
+TRACCAR_API_URL=http://example.com
 TRACCAR_USERNAME=admin
 TRACCAR_PASSWORD=***
 ```
@@ -126,9 +91,6 @@ TRACCAR_PASSWORD=***
 ```bash
 # Debug mode (development only)
 WEBHOOK_DEBUG=false
-
-# Fallback polling still works (if configured)
-SMARTCAR_REFRESH_TOKEN=*** (keep for backup)
 ```
 
 ## How It Works
@@ -151,7 +113,7 @@ SMARTCAR_REFRESH_TOKEN=*** (keep for backup)
 8. Returns 200 OK immediately
 ```
 
-All done in <1 second, vs 5+ minutes with polling!
+All done in under 1 second!
 
 ## Endpoints
 
@@ -179,20 +141,6 @@ Prevents duplicate location updates using event IDs stored in `webhook_dedup.jso
 - 4th attempt: 100s later
 
 Each has same `eventId`, so deduplication ensures it's only processed once.
-
-## Polling Fallback
-
-**Don't remove the polling system yet!** It still works as a backup:
-
-```bash
-# Webhooks (real-time)
-python webhooks/webhook_handler.py &
-
-# Polling (5-min backup)
-python main.py &
-```
-
-Both can run simultaneously and independently update Traccar.
 
 ## Security
 
