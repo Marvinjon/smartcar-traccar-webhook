@@ -8,7 +8,7 @@ import os
 import requests
 import time
 import logging
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 from dotenv import load_dotenv
 from pathlib import Path
 
@@ -76,10 +76,20 @@ class TraccarClient:
         speed: Optional[float] = None,
         course: Optional[float] = None,
         timestamp: Optional[int] = None,
-        odometer_km: Optional[float] = None
+        odometer_km: Optional[float] = None,
+        battery_level: Optional[float] = None,
+        battery_range: Optional[float] = None,
+        fuel_level: Optional[float] = None,
+        low_voltage_battery: Optional[float] = None,
+        is_charging: Optional[bool] = None,
+        vin: Optional[str] = None,
+        doors_status: Optional[str] = None,
+        windows_status: Optional[str] = None,
+        is_locked: Optional[bool] = None,
+        custom_attributes: Optional[Dict] = None
     ) -> Tuple[bool, str]:
         """
-        Send vehicle location to Traccar using OsmAnd protocol.
+        Send vehicle location and telemetry to Traccar using OsmAnd protocol.
         
         Args:
             device_id: Device unique ID (Smartcar vehicle ID)
@@ -91,6 +101,16 @@ class TraccarClient:
             course: Bearing/heading in degrees (optional)
             timestamp: Unix timestamp in seconds (optional, defaults to now)
             odometer_km: Odometer reading in kilometers (optional)
+            battery_level: Main battery level in percent (optional)
+            battery_range: Battery range in km (optional)
+            fuel_level: Fuel level in percent (optional)
+            low_voltage_battery: Low voltage battery level in percent (optional)
+            is_charging: Whether vehicle is charging (optional)
+            vin: Vehicle Identification Number (optional)
+            doors_status: Door status (optional)
+            windows_status: Window status (optional)
+            is_locked: Whether vehicle is locked (optional)
+            custom_attributes: Dict of custom attributes to send (optional)
             
         Returns:
             Tuple of (success: bool, message: str)
@@ -119,7 +139,7 @@ class TraccarClient:
             # OsmAnd protocol: GET /?id={uniqueId}&lat={lat}&lon={lon}&timestamp={timestamp}...
             url = f"{self.base_url}/?id={device_id}&lat={latitude}&lon={longitude}&timestamp={timestamp}"
             
-            # Add optional parameters if provided
+            # Add optional location parameters
             if accuracy is not None:
                 url += f"&accuracy={accuracy}"
             if altitude is not None:
@@ -129,8 +149,37 @@ class TraccarClient:
             if course is not None:
                 url += f"&course={course}"
             if odometer_km is not None:
-                # Convert km to meters for OsmAnd protocol
                 url += f"&odometer={int(odometer_km * 1000)}"
+            
+            # Add battery and charging parameters
+            if battery_level is not None:
+                url += f"&batt={int(battery_level)}"
+            if is_charging is not None:
+                url += f"&charge={str(is_charging).lower()}"
+            if battery_range is not None:
+                url += f"&battery_range={int(battery_range)}"
+            if low_voltage_battery is not None:
+                url += f"&low_voltage_batt={int(low_voltage_battery)}"
+            
+            # Add fuel and vehicle info
+            if fuel_level is not None:
+                url += f"&fuel_level={int(fuel_level)}"
+            if vin is not None:
+                url += f"&vin={vin}"
+            
+            # Add closure status
+            if doors_status is not None:
+                url += f"&doors_status={doors_status}"
+            if windows_status is not None:
+                url += f"&windows_status={windows_status}"
+            if is_locked is not None:
+                url += f"&is_locked={str(is_locked).lower()}"
+            
+            # Add custom attributes
+            if custom_attributes:
+                for key, value in custom_attributes.items():
+                    if value is not None:
+                        url += f"&{key}={value}"
             
             logger.debug(f"Sending to Traccar OsmAnd: {url}")
             response = self.session.get(url, timeout=10)

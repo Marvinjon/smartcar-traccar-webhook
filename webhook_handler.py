@@ -182,15 +182,15 @@ if __name__ == '__main__':
     if debug:
         print("""
 ╔════════════════════════════════════════════════════════════════╗
-║         Smartcar Webhook Server Running (DEBUG MODE)          ║
+║         Smartcar Webhook Server Running (DEBUG MODE)           ║
 ╠════════════════════════════════════════════════════════════════╣
-║ ⚠️  WARNING: Debug mode is ON - NOT suitable for production   ║
+║ ⚠️  WARNING: Debug mode is ON - NOT suitable for production    ║
 ╚════════════════════════════════════════════════════════════════╝
         """)
     else:
         print("""
 ╔════════════════════════════════════════════════════════════════╗
-║         Smartcar Webhook Server Running (PRODUCTION)          ║
+║         Smartcar Webhook Server Running (PRODUCTION)           ║
 ╠════════════════════════════════════════════════════════════════╣
 ║ Server: http://{host}:{port}                                    
 ║ Webhook endpoint: POST /webhooks/smartcar                      

@@ -64,51 +64,108 @@ class WebhookProcessor:
             self.processed_events.add(event_id)
             self._save_processed_events()
     
-    def extract_location(self, signals: list) -> Optional[tuple]:
+    def extract_all_signals(self, signals: list) -> Optional[Dict]:
         """
-        Extract latitude, longitude, odometer, and timestamp from signals list.
+        Extract all available signals from webhook payload.
         
         Args:
             signals: Signals list from webhook payload
             
         Returns:
-            Tuple of (latitude, longitude, odometer_km, timestamp_unix) or None
+            Dict with all extracted signal data or None if no location
         """
         try:
-            latitude = None
-            longitude = None
-            odometer_km = None
-            timestamp = None
+            data = {
+                'latitude': None,
+                'longitude': None,
+                'timestamp': None,
+                'odometer_km': None,
+                'battery_level': None,
+                'battery_range': None,
+                'fuel_level': None,
+                'low_voltage_battery': None,
+                'is_charging': None,
+                'vin': None,
+                'doors_status': None,
+                'windows_status': None,
+                'is_locked': None,
+                'custom_attributes': {}
+            }
             
-            # signals is a list of signal objects
             for signal in signals:
                 group = signal.get('group', '')
+                name = signal.get('name', '')
                 body = signal.get('body', {})
                 meta = signal.get('meta', {})
+                status = signal.get('status', {})
+                
+                if status.get('value') != 'SUCCESS':
+                    continue
                 
                 if group == 'Location':
-                    latitude = body.get('latitude')
-                    longitude = body.get('longitude')
-                    # Get vehicle's actual timestamp (in milliseconds)
+                    data['latitude'] = body.get('latitude')
+                    data['longitude'] = body.get('longitude')
                     oem_updated_at = meta.get('oemUpdatedAt')
                     if oem_updated_at:
-                        timestamp = int(oem_updated_at / 1000)  # Convert ms to seconds
+                        data['timestamp'] = int(oem_updated_at / 1000)
+                
                 elif group == 'Odometer':
                     odometer_value = body.get('value')
                     unit = body.get('unit', 'm')
-                    # Convert to km if needed
                     if odometer_value:
                         if unit == 'km':
-                            odometer_km = float(odometer_value)
-                        else:  # assume meters
-                            odometer_km = float(odometer_value) / 1000
+                            data['odometer_km'] = float(odometer_value)
+                        else:
+                            data['odometer_km'] = float(odometer_value) / 1000
+                
+                elif group == 'TractionBattery':
+                    if name == 'StateOfCharge':
+                        data['battery_level'] = body.get('value')
+                    elif name == 'Range':
+                        data['battery_range'] = body.get('value')
+                
+                elif group == 'LowVoltageBattery':
+                    if name == 'StateOfCharge':
+                        data['low_voltage_battery'] = body.get('value')
+                    elif name == 'Status':
+                        data['custom_attributes']['low_voltage_status'] = body.get('value')
+                
+                elif group == 'InternalCombustionEngine':
+                    if name == 'FuelLevel':
+                        data['fuel_level'] = body.get('value')
+                
+                elif group == 'Charge':
+                    if name == 'IsCharging':
+                        is_charging_val = body.get('value')
+                        data['is_charging'] = is_charging_val in [True, 'true', 'True', 1]
+                    elif name == 'TimeToComplete':
+                        data['custom_attributes']['time_to_complete'] = body.get('value')
+                
+                elif group == 'Closure':
+                    if name == 'Doors':
+                        data['doors_status'] = body.get('value')
+                    elif name == 'Windows':
+                        data['windows_status'] = body.get('value')
+                    elif name == 'IsLocked':
+                        data['is_locked'] = body.get('value')
+                    else:
+                        data['custom_attributes'][f'closure_{name.lower()}'] = body.get('value')
+                
+                elif group == 'VehicleIdentification':
+                    if name == 'VIN':
+                        data['vin'] = body.get('value')
+                    else:
+                        data['custom_attributes'][f'vehicle_{name.lower()}'] = body.get('value')
+                
+                else:
+                    data['custom_attributes'][f'{group.lower()}_{name.lower()}'] = body.get('value')
             
-            if latitude is not None and longitude is not None:
-                return float(latitude), float(longitude), odometer_km, timestamp
+            if data['latitude'] is not None and data['longitude'] is not None:
+                return data
             
             return None
         except (KeyError, ValueError, TypeError) as e:
-            print(f"⚠️  Could not extract location: {e}")
+            print(f"⚠️  Could not extract signals: {e}")
             return None
     
     def process_vehicle_state_event(self, event_id: str, vehicle_id: str, signals: dict) -> bool:
@@ -133,31 +190,41 @@ class WebhookProcessor:
             self.vehicle_locks[vehicle_id] = Lock()
         
         with self.vehicle_locks[vehicle_id]:
-            # Extract location data
-            location_data = self.extract_location(signals)
+            # Extract all signal data
+            signal_data = self.extract_all_signals(signals)
             
-            if not location_data:
+            if not signal_data:
                 print(f"⚠️  No location data in event {event_id} for vehicle {vehicle_id}")
                 self.mark_processed(event_id)
                 return True
-            
-            latitude, longitude, odometer_km, timestamp = location_data
             
             # Update Traccar
             try:
                 success, message = self.traccar.send_location(
                     device_id=vehicle_id,
-                    latitude=latitude,
-                    longitude=longitude,
-                    accuracy=None,
-                    timestamp=timestamp,
-                    odometer_km=odometer_km
+                    latitude=signal_data['latitude'],
+                    longitude=signal_data['longitude'],
+                    timestamp=signal_data['timestamp'],
+                    odometer_km=signal_data['odometer_km'],
+                    battery_level=signal_data['battery_level'],
+                    battery_range=signal_data['battery_range'],
+                    fuel_level=signal_data['fuel_level'],
+                    low_voltage_battery=signal_data['low_voltage_battery'],
+                    is_charging=signal_data['is_charging'],
+                    vin=signal_data['vin'],
+                    doors_status=signal_data['doors_status'],
+                    windows_status=signal_data['windows_status'],
+                    is_locked=signal_data['is_locked'],
+                    custom_attributes=signal_data['custom_attributes']
                 )
                 
                 if success:
-                    odo_str = f"{odometer_km:.1f} km" if odometer_km else "no odometer"
-                    ts_str = f"timestamp={timestamp}" if timestamp else "current time"
-                    print(f"✓ Updated vehicle {vehicle_id}: {latitude}, {longitude} ({odo_str}, {ts_str})")
+                    details = f"{signal_data['latitude']}, {signal_data['longitude']}"
+                    if signal_data['odometer_km']:
+                        details += f" ({signal_data['odometer_km']:.1f} km)"
+                    if signal_data['battery_level']:
+                        details += f" [batt: {signal_data['battery_level']}%]"
+                    print(f"✓ Updated vehicle {vehicle_id}: {details}")
                     # Mark as processed only after successful update
                     self.mark_processed(event_id)
                     return True
