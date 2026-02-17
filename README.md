@@ -4,15 +4,6 @@ Real-time vehicle location updates using Smartcar's event-driven webhook system 
 
 ## Overview
 
-**Why webhooks instead of polling?**
-
-| Aspect | Polling (Old) | Webhooks (New) |
-|--------|---------------|----------------|
-| **API Calls** | Every 5 min per vehicle | Only on location change |
-| **For 100 vehicles** | ~288 API calls/day | ~10-50 calls/day |
-| **Latency** | ~5 min delay | <5 seconds |
-| **Cost** | Higher (continuous polls) | Lower (event-based) |
-| **Scalability** | Limited (rate limits) | Excellent (event-based) |
 
 ## Architecture
 
@@ -134,10 +125,7 @@ WEBHOOK_PORT=5000              # Port webhook listens on
 WEBHOOK_DEBUG=false            # Enable Flask debug mode
 
 # Smartcar
-SMARTCAR_MANAGEMENT_TOKEN=***  # From Smartcar Dashboard
-SMARTCAR_CLIENT_ID=***         # Keep for fallback polling
-SMARTCAR_CLIENT_SECRET=***     # Keep for fallback polling
-SMARTCAR_REFRESH_TOKEN=***     # Keep for fallback polling
+SMARTCAR_MANAGEMENT_TOKEN=***  # From Smartcar Dashboard - application management token
 
 # Traccar (required for location updates)
 TRACCAR_API_URL=http://example.com:5055
