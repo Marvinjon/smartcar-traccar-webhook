@@ -1,10 +1,6 @@
 # Webhooks Integration Summary
 
-## What's New
-
-A complete webhook-based real-time location tracking system has been added to your project.
-
-### New Files Structure
+### Files Structure
 
 ```
 webhooks/
@@ -59,8 +55,7 @@ This will:
    - Location.Latitude
    - Location.Longitude  
    - Odometer.Odometer
-4. Copy the **Secret** shown
-5. Update `.env`: `SMARTCAR_WEBHOOK_SECRET=<paste_here>`
+4. use the application management token to put in the .env file SMARTCAR_MANAGEMENT_TOKEN=<your-management-token>
 
 ### 4. Start Webhook Server
 
@@ -73,7 +68,7 @@ python webhooks/webhook_handler.py
 ### Required .env Variables
 
 ```bash
-# Webhook Secret from Smartcar Dashboard
+# Webhook Secret from Smartcar Dashboard - the application management token
 SMARTCAR_WEBHOOK_SECRET=your_webhook_secret_here
 
 # Server configuration
@@ -82,7 +77,7 @@ WEBHOOK_PORT=5000
 
 # Traccar (unchanged)
 TRACCAR_API_URL=http://example.com
-TRACCAR_USERNAME=admin
+TRACCAR_USERNAME=admin@admin.com
 TRACCAR_PASSWORD=***
 ```
 
@@ -112,8 +107,6 @@ WEBHOOK_DEBUG=false
         ↓
 8. Returns 200 OK immediately
 ```
-
-All done in under 1 second!
 
 ## Endpoints
 
@@ -179,64 +172,3 @@ curl http://localhost:5000/webhooks/stats
 📡 Webhook received: VEHICLE_STATE
    Smartcar sent a vehicle state change event
 ```
-
-## Troubleshooting
-
-### Webhooks not being received
-
-**Problem:** No logs in webhook handler
-**Solution:** Check that:
-1. Domain resolves publicly: `nslookup your-domain.com`
-2. Port is accessible: `curl https://your-domain.com/webhooks/health`
-3. Webhook is enabled in Smartcar Dashboard
-4. No firewall blocking incoming connections
-
-### Location not updating
-
-**Problem:** Logs show "No location data"
-**Solution:**
-1. Check Smartcar Dashboard → Webhook Logs for signal delivery
-2. Verify signals subscribed: Location.Latitude, Location.Longitude
-3. Check Traccar credentials in .env
-4. Verify vehicle ID matches between Smartcar and Traccar
-
-### Getting "Invalid signature" errors
-
-**Problem:** Logs show signature validation failures
-**Solution:**
-1. Copy webhook SECRET exactly from Dashboard (no extra spaces)
-2. Update .env: `SMARTCAR_WEBHOOK_SECRET=<exact_copy>`
-3. Restart webhook handler
-4. Test: `curl http://localhost:5000/webhooks/health` works (no signature needed)
-
-## Deployment
-
-See [webhooks/README.md](webhooks/README.md#production-deployment) for:
-- Systemd (Linux) service setup
-- Supervisor process management
-- Docker containerization
-- Nginx reverse proxy config
-- Let's Encrypt SSL setup
-
-## Next Steps
-
-1. **Install Flask:** `pip install flask`
-2. **Run Setup:** `python webhooks/setup.py`
-3. **Create Webhook:** Follow printed instructions on Smartcar Dashboard
-4. **Update .env:** Add `SMARTCAR_WEBHOOK_SECRET`
-5. **Start Server:** `python webhooks/webhook_handler.py`
-6. **Test:** `curl http://localhost:5000/webhooks/health`
-7. **Monitor:** Watch logs for incoming webhook events
-
-## Documentation
-
-- **[webhooks/README.md](webhooks/README.md)** - Full documentation
-- **[webhook_handler.py](webhook_handler.py)** - Server code
-- **[webhook_processor.py](webhook_processor.py)** - Event processing logic
-- **[webhook_config.py](webhook_config.py)** - Configuration helper
-
-## Questions?
-
-For Smartcar API specific issues: https://smartcar.com/docs  
-For webhook debugging: View logs in Smartcar Dashboard → Webhooks → Logs  
-For integration issues: Check logs from `python webhooks/webhook_handler.py`

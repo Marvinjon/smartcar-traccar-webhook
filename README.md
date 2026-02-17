@@ -220,26 +220,6 @@ docker build -t smartcar-webhook .
 docker run -p 5000:5000 --env-file .env smartcar-webhook
 ```
 
-### Reverse Proxy (Nginx)
-
-```nginx
-server {
-    server_name tracker.example.com;
-    listen 443 ssl;
-    
-    ssl_certificate /etc/letsencrypt/live/tracker.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/tracker.example.com/privatekey.pem;
-    
-    location / {
-        proxy_pass http://127.0.0.1:5000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
 ## Monitoring
 
 ### Check Logs
@@ -264,14 +244,6 @@ curl https://your-domain.com/webhooks/stats
   "traccar_authenticated": true
 }
 ```
-
-### Alerts
-
-Set up alerts for:
-- High error rate in logs
-- Processed events not increasing
-- Traccar authentication failures
-- Webhook signature validation failures
 
 ## Troubleshooting
 
@@ -334,21 +306,9 @@ Incoming `VEHICLE_STATE` event:
 }
 ```
 
-### Response
-
-Always return 200 OK immediately:
-
-```json
-{
-  "status": "received"
-}
-```
-
 ## Production Deployment
 
-For production deployment to Ubuntu servers with Nginx, SSL, and systemd:
-
-**→ See [DEPLOYMENT.md](DEPLOYMENT.md) for complete setup guide**
+For production deployment to Ubuntu servers with systemd:
 
 ### Quick Deployment
 
@@ -370,7 +330,6 @@ sudo systemctl status smartcar-webhook
 ### Key Production Features
 
 - ✓ Gunicorn WSGI server (4 workers by default)
-- ✓ Nginx reverse proxy with SSL/TLS
 - ✓ Systemd auto-start and restart
 - ✓ Structured logging to files
 - ✓ Health check endpoint
@@ -383,5 +342,3 @@ sudo systemctl status smartcar-webhook
 For Smartcar API issues: https://smartcar.com/docs
 For webhook debugging: Check Smartcar Dashboard → Webhooks → Logs
 For Traccar issues: Check Traccar server logs
-For deployment help: See DEPLOYMENT.md
-
