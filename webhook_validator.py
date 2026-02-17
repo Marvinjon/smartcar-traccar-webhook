@@ -7,7 +7,11 @@ Validates SC-Signature header using HMAC-SHA256.
 import hmac
 import hashlib
 import json
+import os
+import logging
 from typing import Tuple
+
+logger = logging.getLogger(__name__)
 
 
 def validate_signature(payload: str, signature: str, secret: str) -> bool:
@@ -32,6 +36,15 @@ def validate_signature(payload: str, signature: str, secret: str) -> bool:
             payload.encode('utf-8'),
             hashlib.sha256
         ).hexdigest()
+
+        debug_signatures = os.getenv('SMARTCAR_DEBUG_SIGNATURE', '').lower() == 'true'
+        if debug_signatures:
+            logger.warning(
+                "Signature debug: expected=%s received=%s payload_bytes=%s",
+                expected_signature,
+                signature,
+                len(payload)
+            )
         
         # Constant-time comparison to prevent timing attacks
         return hmac.compare_digest(expected_signature, signature)
