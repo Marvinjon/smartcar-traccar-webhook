@@ -1,6 +1,6 @@
 # Smartcar Webhooks Integration
 
-Real-time vehicle location updates using Smartcar's event-driven webhook system instead of polling.
+Real-time vehicle location updates using Smartcar's event-driven webhook system.
 
 ## Overview
 
