@@ -161,23 +161,6 @@ class WebhookProcessor:
                     data['custom_attributes'][f'{group.lower()}_{name.lower()}'] = body.get('value')
             
             if data['latitude'] is not None and data['longitude'] is not None:
-                # Log extracted data for debugging
-                print(f"📊 Extracted signals:")
-                print(f"   Location: {data['latitude']}, {data['longitude']}")
-                if data['odometer_km']:
-                    print(f"   Odometer: {data['odometer_km']} km")
-                if data['battery_level']:
-                    print(f"   Battery: {data['battery_level']}%")
-                if data['battery_range']:
-                    print(f"   Range: {data['battery_range']} km")
-                if data['fuel_level'] is not None:
-                    print(f"   Fuel: {data['fuel_level']}%")
-                if data['low_voltage_battery']:
-                    print(f"   Low Voltage Battery: {data['low_voltage_battery']}%")
-                if data['vin']:
-                    print(f"   VIN: {data['vin']}")
-                if data['custom_attributes']:
-                    print(f"   Custom Attributes: {data['custom_attributes']}")
                 return data
             
             return None
