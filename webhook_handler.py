@@ -116,11 +116,11 @@ def handle_smartcar_webhook():
                 # Validate signature for production webhooks only
                 raw_payload = request.get_data(as_text=True)
                 signature = request.headers.get('SC-Signature')
-                webhook_secret = os.getenv('SMARTCAR_WEBHOOK_SECRET')
+                webhook_secret = os.getenv('SMARTCAR_MANAGEMENT_TOKEN')
                 
                 if not webhook_secret:
-                    logger.error("❌ SMARTCAR_WEBHOOK_SECRET not configured")
-                    return jsonify({"error": "Webhook secret not configured"}), 500
+                    logger.error("❌ SMARTCAR_MANAGEMENT_TOKEN not configured")
+                    return jsonify({"error": "Management token not configured"}), 500
                 
                 if not validate_signature(raw_payload, signature, webhook_secret):
                     logger.warning(f"❌ Invalid webhook signature: {signature[:20] if signature else 'None'}...")
@@ -177,7 +177,7 @@ if __name__ == '__main__':
     debug = os.getenv('WEBHOOK_DEBUG', 'false').lower() == 'true'
     
     # Check for required environment variables
-    required_vars = ['SMARTCAR_WEBHOOK_SECRET', 'TRACCAR_API_URL', 'TRACCAR_USERNAME', 'TRACCAR_PASSWORD']
+    required_vars = ['SMARTCAR_MANAGEMENT_TOKEN', 'TRACCAR_API_URL', 'TRACCAR_USERNAME', 'TRACCAR_PASSWORD']
     missing_vars = [var for var in required_vars if not os.getenv(var)]
     
     if missing_vars:
@@ -205,8 +205,8 @@ if __name__ == '__main__':
 ╚════════════════════════════════════════════════════════════════╝
         """.format(host=host, port=port))
     
-    if not os.getenv('SMARTCAR_WEBHOOK_SECRET'):
-        print("❌ WARNING: SMARTCAR_WEBHOOK_SECRET not set")
+    if not os.getenv('SMARTCAR_MANAGEMENT_TOKEN'):
+        print("❌ WARNING: SMARTCAR_MANAGEMENT_TOKEN not set")
         print("   Webhook signature validation will FAIL\n")
     
     app.run(host=host, port=port, debug=debug)

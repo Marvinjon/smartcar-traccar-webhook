@@ -64,10 +64,10 @@ SMARTCAR WEBHOOK SETUP INSTRUCTIONS
    Signals (OPTIONAL - for additional features):
    {chr(10).join(f'   ○ {signal}' for signal in WebhookConfig.OPTIONAL_SIGNALS)}
 
-4. After creating webhook, copy the webhook SECRET
+4. Get your Application Management Token from Smartcar Dashboard
 
 5. Update your .env file:
-   SMARTCAR_WEBHOOK_SECRET=<paste_secret_here>
+    SMARTCAR_MANAGEMENT_TOKEN=<paste_token_here>
    WEBHOOK_HOST=0.0.0.0
    WEBHOOK_PORT=5000
 
@@ -102,7 +102,7 @@ SMARTCAR WEBHOOK SETUP INSTRUCTIONS
             Tuple of (is_valid, missing_keys, warnings)
         """
         required = [
-            'SMARTCAR_WEBHOOK_SECRET',
+            'SMARTCAR_MANAGEMENT_TOKEN',
             'TRACCAR_API_URL',
             'TRACCAR_USERNAME',
             'TRACCAR_PASSWORD',

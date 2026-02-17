@@ -54,13 +54,13 @@ This will print setup instructions.
      - ✓ Location.Longitude
      - ✓ Odometer.Odometer
 
-3. Copy the webhook **Secret** shown after creation
+3. Note your **Application Management Token** from Smartcar Dashboard
 
 ### 4. Update .env
 
 ```bash
 # Add these variables to .env
-SMARTCAR_WEBHOOK_SECRET=<paste_secret_here>
+SMARTCAR_MANAGEMENT_TOKEN=<paste_token_here>
 WEBHOOK_HOST=0.0.0.0
 WEBHOOK_PORT=5000
 ```
@@ -134,7 +134,7 @@ WEBHOOK_PORT=5000              # Port webhook listens on
 WEBHOOK_DEBUG=false            # Enable Flask debug mode
 
 # Smartcar
-SMARTCAR_WEBHOOK_SECRET=***    # From Smartcar Dashboard
+SMARTCAR_MANAGEMENT_TOKEN=***  # From Smartcar Dashboard
 SMARTCAR_CLIENT_ID=***         # Keep for fallback polling
 SMARTCAR_CLIENT_SECRET=***     # Keep for fallback polling
 SMARTCAR_REFRESH_TOKEN=***     # Keep for fallback polling
