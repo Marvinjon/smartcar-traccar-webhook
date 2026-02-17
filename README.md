@@ -2,8 +2,6 @@
 
 Real-time vehicle location updates using Smartcar's event-driven webhook system.
 
-## Overview
-
 ## Architecture
 
 ```
@@ -28,7 +26,7 @@ pip install flask
 
 Run setup helper:
 ```bash
-python webhooks/webhook_config.py your-domain.com
+python webhook_config.py your-domain.com
 ```
 
 This will print setup instructions.
@@ -58,7 +56,7 @@ WEBHOOK_PORT=5000
 ### 5. Start Webhook Server
 
 ```bash
-python webhooks/webhook_handler.py
+python webhook_handler.py
 ```
 
 Expected output:
@@ -113,7 +111,7 @@ Setup helper and configuration validation.
 - `validate_config()` - Check .env configuration
 - Run with domain: `python webhook_config.py your-domain.com`
 
-## Important Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -138,10 +136,10 @@ Processed event IDs are stored in `webhook_dedup.json` to prevent duplicate upda
 
 Example:
 ```json
-{
+[
   "f7c0f3e6-4c9d-4f0e-8e5d-6e7f8a9b0c1d",
   "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-}
+]
 ```
 
 **Why?** Smartcar retries failed deliveries. Using `eventId` ensures the same location change is only processed once.
@@ -153,35 +151,6 @@ Example:
 ✓ **HTTPS Only** - Smartcar requires valid SSL certificates
 ✓ **Immediate Response** - Returns 200 immediately to prevent retries on timeout
 ✓ **Async Processing** - Long operations won't block webhook response
-
-## Production Deployment
-
-### Systemd (Linux)
-
-Create `/etc/systemd/system/smartcar-webhook.service`:
-```ini
-[Unit]
-Description=Smartcar Webhook Service
-After=network.target
-
-[Service]
-Type=simple
-User=www-data
-WorkingDirectory=/path/to/smartcar-test
-Environment="PYTHONUNBUFFERED=1"
-ExecStart=/usr/bin/python3 /path/to/smartcar-test/webhooks/webhook_handler.py
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Then:
-```bash
-sudo systemctl enable smartcar-webhook
-sudo systemctl start smartcar-webhook
-```
-
 
 ## Monitoring
 
@@ -269,17 +238,16 @@ Incoming `VEHICLE_STATE` event:
 }
 ```
 
-## Production Deployment
+## Deployment
 
-For production deployment to Ubuntu servers with systemd:
-
-### Quick Deployment
+For deployment to Ubuntu servers with systemd. A sample systemd unit file is included in [smartcar-webhook.service](smartcar-webhook.service).
 
 ```bash
 # 1. Run deployment script
 bash deploy.sh
 
-# 2. Edit systemd service file with your paths
+# 2. Copy and edit the systemd service file with your paths
+sudo cp smartcar-webhook.service /etc/systemd/system/
 sudo nano /etc/systemd/system/smartcar-webhook.service
 
 # 3. Start service
@@ -290,7 +258,7 @@ sudo systemctl start smartcar-webhook
 sudo systemctl status smartcar-webhook
 ```
 
-### Key Production Features
+### Key Features
 
 - ✓ Gunicorn WSGI server (4 workers by default)
 - ✓ Systemd auto-start and restart
