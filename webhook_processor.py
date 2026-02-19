@@ -72,7 +72,7 @@ class WebhookProcessor:
             signals: Signals list from webhook payload
             
         Returns:
-            Dict with all extracted signal data or None if no location
+            Dict with all extracted signal data, or None if no useful signals at all
         """
         try:
             data = {
@@ -160,7 +160,16 @@ class WebhookProcessor:
                 else:
                     data['custom_attributes'][f'{group.lower()}_{name.lower()}'] = body.get('value')
             
-            if data['latitude'] is not None and data['longitude'] is not None:
+            # Return data if we have any useful signals (not just empty defaults)
+            has_location = data['latitude'] is not None and data['longitude'] is not None
+            has_other_data = any(
+                data[k] is not None 
+                for k in ['odometer_km', 'battery_level', 'battery_range', 'fuel_level',
+                          'low_voltage_battery', 'is_charging', 'vin', 'doors_status',
+                          'windows_status', 'is_locked']
+            ) or bool(data['custom_attributes'])
+            
+            if has_location or has_other_data:
                 return data
             
             return None
@@ -194,9 +203,11 @@ class WebhookProcessor:
             signal_data = self.extract_all_signals(signals)
             
             if not signal_data:
-                print(f"⚠️  No location data in event {event_id} for vehicle {vehicle_id}")
+                print(f"\u26a0\ufe0f  No useful data in event {event_id} for vehicle {vehicle_id}")
                 self.mark_processed(event_id)
                 return True
+            
+            has_location = signal_data['latitude'] is not None and signal_data['longitude'] is not None
             
             # Update Traccar
             try:
@@ -219,7 +230,10 @@ class WebhookProcessor:
                 )
                 
                 if success:
-                    details = f"{signal_data['latitude']}, {signal_data['longitude']}"
+                    if has_location:
+                        details = f"{signal_data['latitude']}, {signal_data['longitude']}"
+                    else:
+                        details = "no location"
                     if signal_data['odometer_km']:
                         details += f" ({signal_data['odometer_km']:.1f} km)"
                     if signal_data['battery_level']:

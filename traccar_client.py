@@ -94,8 +94,8 @@ class TraccarClient:
     def send_location(
         self,
         device_id: str,
-        latitude: float,
-        longitude: float,
+        latitude: Optional[float] = None,
+        longitude: Optional[float] = None,
         accuracy: Optional[float] = None,
         altitude: Optional[float] = None,
         speed: Optional[float] = None,
@@ -160,9 +160,13 @@ class TraccarClient:
             if timestamp is None:
                 timestamp = int(time.time())
             
-            # Build OsmAnd protocol request to example.com
-            # OsmAnd protocol: GET /?id={uniqueId}&lat={lat}&lon={lon}&timestamp={timestamp}...
-            url = f"{self.base_url}/?id={device_id}&lat={latitude}&lon={longitude}&timestamp={timestamp}"
+            # Build OsmAnd protocol request
+            # OsmAnd protocol: GET /?id={uniqueId}&timestamp={timestamp}[&lat={lat}&lon={lon}]...
+            url = f"{self.base_url}/?id={device_id}&timestamp={timestamp}"
+            
+            # Add location if available
+            if latitude is not None and longitude is not None:
+                url += f"&lat={latitude}&lon={longitude}"
             
             # Add optional location parameters
             if accuracy is not None:
