@@ -66,6 +66,31 @@ class TraccarClient:
             logger.error(f"❌ Traccar connection error: {e}")
             return False
     
+    def _request_with_reauth(self, method: str, url: str, retried: bool = False, **kwargs):
+        """
+        Make an authenticated API request, automatically re-authenticating on 401.
+        
+        Args:
+            method: HTTP method ('get', 'post', etc.)
+            url: Request URL
+            retried: Internal flag to prevent infinite retry loops
+            **kwargs: Additional arguments passed to requests.Session.request()
+            
+        Returns:
+            requests.Response object
+        """
+        response = self.session.request(method, url, **kwargs)
+        
+        if response.status_code == 401 and not retried:
+            logger.warning("⚠️  Traccar session expired, re-authenticating...")
+            if self._authenticate():
+                logger.info("✓ Re-authenticated with Traccar successfully")
+                return self._request_with_reauth(method, url, retried=True, **kwargs)
+            else:
+                logger.error("❌ Re-authentication failed")
+        
+        return response
+    
     def send_location(
         self,
         device_id: str,
@@ -209,7 +234,7 @@ class TraccarClient:
         
         try:
             url = f"{self.api_url}/api/devices"
-            response = self.session.get(url, timeout=10)
+            response = self._request_with_reauth('get', url, timeout=10)
             
             if response.status_code == 200:
                 devices = response.json()
@@ -249,7 +274,7 @@ class TraccarClient:
                 'category': 'car',
             }
             
-            response = self.session.post(url, json=payload, timeout=10)
+            response = self._request_with_reauth('post', url, json=payload, timeout=10)
             
             if response.status_code == 200:
                 result = response.json()
