@@ -10,11 +10,19 @@ from threading import Lock
 from typing import Optional, Dict, Set
 from pathlib import Path
 import sys
+import os
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from traccar_client import TraccarClient
+
+
+def _get_default_coords():
+    """Get default coordinates from environment for devices without location."""
+    lat = float(os.getenv('DEFAULT_LATITUDE', '0.0'))
+    lon = float(os.getenv('DEFAULT_LONGITUDE', '0.0'))
+    return lat, lon
 
 
 class WebhookProcessor:
@@ -209,12 +217,15 @@ class WebhookProcessor:
             
             has_location = signal_data['latitude'] is not None and signal_data['longitude'] is not None
             
+            if not has_location:
+                default_lat, default_lon = _get_default_coords()
+            
             # Update Traccar
             try:
                 success, message = self.traccar.send_location(
                     device_id=vehicle_id,
-                    latitude=signal_data['latitude'] if has_location else 0,
-                    longitude=signal_data['longitude'] if has_location else 0,
+                    latitude=signal_data['latitude'] if has_location else default_lat,
+                    longitude=signal_data['longitude'] if has_location else default_lon,
                     timestamp=signal_data['timestamp'],
                     odometer_km=signal_data['odometer_km'],
                     battery_level=signal_data['battery_level'],
