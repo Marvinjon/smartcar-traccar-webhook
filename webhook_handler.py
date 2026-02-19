@@ -48,7 +48,29 @@ app = Flask(__name__)
 processor = WebhookProcessor()
 
 
-def handle_verification(payload):
+def get_management_token(integration_name: str = None) -> str:
+    """
+    Get the management token for a given integration.
+    
+    Args:
+        integration_name: Optional integration name (e.g., 'fleet2').
+                         If None, uses the default SMARTCAR_MANAGEMENT_TOKEN.
+    
+    Returns:
+        The management token string, or None if not configured.
+    """
+    if integration_name:
+        # Try SMARTCAR_MANAGEMENT_TOKEN_<NAME> (case-insensitive lookup)
+        token = os.getenv(f'SMARTCAR_MANAGEMENT_TOKEN_{integration_name.upper()}')
+        if token:
+            return token
+        logger.error(f"❌ No management token configured for integration '{integration_name}'")
+        logger.error(f"   Set SMARTCAR_MANAGEMENT_TOKEN_{integration_name.upper()} in your .env")
+        return None
+    return os.getenv('SMARTCAR_MANAGEMENT_TOKEN')
+
+
+def handle_verification(payload, integration_name=None):
     """
     Handle Smartcar webhook verification challenge.
     
@@ -56,10 +78,10 @@ def handle_verification(payload):
     We must respond with an HMAC signature of the challenge.
     """
     try:
-        management_token = os.getenv('SMARTCAR_MANAGEMENT_TOKEN')
+        management_token = get_management_token(integration_name)
         
         if not management_token:
-            logger.error("❌ SMARTCAR_MANAGEMENT_TOKEN not configured")
+            logger.error("❌ Management token not configured")
             return jsonify({"error": "Management token not configured"}), 500
         
         data = payload.get('data', {})
@@ -71,7 +93,8 @@ def handle_verification(payload):
         
         # Generate signature using Smartcar SDK
         hmac_signature = smartcar.hash_challenge(management_token, challenge)
-        logger.info(f"✓ Webhook verification successful")
+        integration_label = f" ({integration_name})" if integration_name else ""
+        logger.info(f"✓ Webhook verification successful{integration_label}")
         
         return jsonify({'challenge': hmac_signature}), 200
         
@@ -80,13 +103,12 @@ def handle_verification(payload):
         return jsonify({"error": "Verification failed"}), 500
 
 
-@app.route('/webhooks/smartcar', methods=['POST'])
-def handle_smartcar_webhook():
+def _handle_webhook(integration_name=None):
     """
-    Handle incoming Smartcar webhooks.
+    Core webhook handler logic, shared by all integration routes.
     
-    Handles VERIFY events for webhook validation and VEHICLE_STATE events
-    for location updates. Returns immediately (200 OK).
+    Args:
+        integration_name: Optional integration name for multi-webhook support.
     """
     try:
         # Parse JSON
@@ -101,25 +123,26 @@ def handle_smartcar_webhook():
             return jsonify({"error": "Empty payload"}), 400
         
         event_type = payload.get('eventType')
-        logger.info(f"Webhook received: {event_type}")
+        integration_label = f" [{integration_name}]" if integration_name else ""
+        logger.info(f"Webhook received: {event_type}{integration_label}")
         
         # Handle verification challenge
         if event_type == 'VERIFY':
-            return handle_verification(payload)
+            return handle_verification(payload, integration_name)
         
         # Handle vehicle state updates
         if event_type == 'VEHICLE_STATE':
             # Validate signature for all webhooks (including TEST mode)
             raw_payload = request.get_data(as_text=True)
             signature = request.headers.get('SC-Signature')
-            webhook_secret = os.getenv('SMARTCAR_MANAGEMENT_TOKEN')
+            webhook_secret = get_management_token(integration_name)
             
             if not webhook_secret:
-                logger.error("❌ SMARTCAR_MANAGEMENT_TOKEN not configured")
+                logger.error(f"❌ Management token not configured{integration_label}")
                 return jsonify({"error": "Management token not configured"}), 500
             
             if not validate_signature(raw_payload, signature, webhook_secret):
-                logger.warning(f"❌ Invalid webhook signature: {signature[:20] if signature else 'None'}...")
+                logger.warning(f"❌ Invalid webhook signature{integration_label}: {signature[:20] if signature else 'None'}...")
                 return jsonify({"error": "Invalid signature"}), 401
             
             # Extract event data
@@ -129,23 +152,35 @@ def handle_smartcar_webhook():
                 logger.error("❌ Missing event ID or vehicle ID")
                 return jsonify({"error": "Missing required fields"}), 400
             
-            # Process webhook asynchronously
+            # Process webhook
             success = processor.process_webhook(payload)
-            logger.info(f"✓ Processed vehicle state for {vehicle_id}")
+            logger.info(f"✓ Processed vehicle state for {vehicle_id}{integration_label}")
         
         elif event_type == 'VEHICLE_ERROR':
-            logger.warning(f"Vehicle error received: {payload}")
+            logger.warning(f"Vehicle error received{integration_label}: {payload}")
         
         else:
-            logger.warning(f"Unknown event type: {event_type}")
+            logger.warning(f"Unknown event type: {event_type}{integration_label}")
         
         # Always return 200 immediately
         # This prevents Smartcar from retrying
         return jsonify({"status": "received"}), 200
         
     except Exception as e:
-        logger.error(f"❌ Webhook handler error: {e}")
+        logger.error(f"❌ Webhook handler error{integration_label}: {e}")
         return jsonify({"status": "received"}), 200
+
+
+@app.route('/webhooks/smartcar', methods=['POST'])
+def handle_smartcar_webhook():
+    """Handle incoming Smartcar webhooks (default integration)."""
+    return _handle_webhook()
+
+
+@app.route('/webhooks/smartcar/<integration_name>', methods=['POST'])
+def handle_smartcar_webhook_named(integration_name):
+    """Handle incoming Smartcar webhooks for a named integration."""
+    return _handle_webhook(integration_name)
 
 
 @app.route('/webhooks/health', methods=['GET'])
