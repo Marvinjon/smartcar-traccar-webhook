@@ -391,13 +391,26 @@ class TraccarClient:
             url = f"{self.api_url}/api/devices/{traccar_id}"
             response = self._request_with_reauth('put', url, json=device, timeout=10)
             
-            if response.status_code == 200:
-                logger.info(f"\u2713 Updated attributes for device {device_id} (ID: {traccar_id})")
-                return True, "Attributes updated"
-            else:
+            if response.status_code != 200:
                 logger.error(f"\u274c Error updating device attributes: {response.status_code}")
                 logger.error(f"   Response: {response.text}")
                 return False, f"HTTP {response.status_code}"
+            
+            # Also set totalDistance via accumulators API so it shows in the Traccar UI
+            if odometer_km is not None:
+                acc_url = f"{self.api_url}/api/devices/{traccar_id}/accumulators"
+                acc_payload = {
+                    'deviceId': traccar_id,
+                    'totalDistance': odometer_km * 1000,  # meters
+                }
+                acc_response = self._request_with_reauth('put', acc_url, json=acc_payload, timeout=10)
+                if acc_response.status_code == 204:
+                    logger.info(f"✓ Set odometer for device {device_id}: {odometer_km:.1f} km")
+                else:
+                    logger.warning(f"⚠️  Could not set accumulator: {acc_response.status_code} {acc_response.text}")
+            
+            logger.info(f"✓ Updated attributes for device {device_id} (ID: {traccar_id})")
+            return True, "Attributes updated"
                 
         except Exception as e:
             logger.error(f"\u274c Error updating device attributes for {device_id}: {e}")
