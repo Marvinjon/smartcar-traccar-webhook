@@ -211,23 +211,41 @@ class WebhookProcessor:
             
             # Update Traccar
             try:
-                success, message = self.traccar.send_location(
-                    device_id=vehicle_id,
-                    latitude=signal_data['latitude'],
-                    longitude=signal_data['longitude'],
-                    timestamp=signal_data['timestamp'],
-                    odometer_km=signal_data['odometer_km'],
-                    battery_level=signal_data['battery_level'],
-                    battery_range=signal_data['battery_range'],
-                    fuel_level=signal_data['fuel_level'],
-                    low_voltage_battery=signal_data['low_voltage_battery'],
-                    is_charging=signal_data['is_charging'],
-                    vin=signal_data['vin'],
-                    doors_status=signal_data['doors_status'],
-                    windows_status=signal_data['windows_status'],
-                    is_locked=signal_data['is_locked'],
-                    custom_attributes=signal_data['custom_attributes']
-                )
+                if has_location:
+                    # Send full position update via OsmAnd protocol
+                    success, message = self.traccar.send_location(
+                        device_id=vehicle_id,
+                        latitude=signal_data['latitude'],
+                        longitude=signal_data['longitude'],
+                        timestamp=signal_data['timestamp'],
+                        odometer_km=signal_data['odometer_km'],
+                        battery_level=signal_data['battery_level'],
+                        battery_range=signal_data['battery_range'],
+                        fuel_level=signal_data['fuel_level'],
+                        low_voltage_battery=signal_data['low_voltage_battery'],
+                        is_charging=signal_data['is_charging'],
+                        vin=signal_data['vin'],
+                        doors_status=signal_data['doors_status'],
+                        windows_status=signal_data['windows_status'],
+                        is_locked=signal_data['is_locked'],
+                        custom_attributes=signal_data['custom_attributes']
+                    )
+                else:
+                    # No location - update device attributes via REST API
+                    success, message = self.traccar.update_device_attributes(
+                        device_id=vehicle_id,
+                        odometer_km=signal_data['odometer_km'],
+                        battery_level=signal_data['battery_level'],
+                        battery_range=signal_data['battery_range'],
+                        fuel_level=signal_data['fuel_level'],
+                        low_voltage_battery=signal_data['low_voltage_battery'],
+                        is_charging=signal_data['is_charging'],
+                        vin=signal_data['vin'],
+                        doors_status=signal_data['doors_status'],
+                        windows_status=signal_data['windows_status'],
+                        is_locked=signal_data['is_locked'],
+                        custom_attributes=signal_data['custom_attributes']
+                    )
                 
                 if success:
                     if has_location:
