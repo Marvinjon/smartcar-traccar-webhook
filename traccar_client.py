@@ -5,6 +5,7 @@ Sends vehicle location updates to Traccar using OsmAnd protocol.
 """
 
 import os
+import secrets
 import requests
 import time
 import logging
@@ -301,3 +302,163 @@ class TraccarClient:
         except Exception as e:
             logger.error(f"Error creating device {name}: {e}")
             return False, str(e), None
+
+    def get_users(self):
+        """
+        Get list of all users from Traccar API.
+        Requires admin authentication.
+
+        Returns:
+            List of user dictionaries
+        """
+        if not self.authenticated:
+            if not self._authenticate():
+                return []
+
+        try:
+            url = f"{self.api_url}/api/users"
+            response = self._request_with_reauth('get', url, timeout=10)
+
+            if response.status_code == 200:
+                users = response.json()
+                logger.debug(f"Retrieved {len(users)} users from Traccar")
+                return users
+            else:
+                logger.error(f"Error fetching users: {response.status_code} — {response.text}")
+                return []
+
+        except Exception as e:
+            logger.error(f"Error fetching users from Traccar: {e}")
+            return []
+
+    def create_user(self, smartcar_user_id: str, email: str, password: str) -> Tuple[bool, str, Optional[int]]:
+        """
+        Create a new Traccar user account for a Smartcar user.
+
+        Args:
+            smartcar_user_id: Smartcar user UUID (used as display name)
+            email: Email address for the new account
+            password: Password for the new account
+
+        Returns:
+            Tuple of (success: bool, message: str, traccar_user_id: int or None)
+        """
+        if not self.authenticated:
+            if not self._authenticate():
+                return False, "Not authenticated with Traccar", None
+
+        try:
+            url = f"{self.api_url}/api/users"
+            payload = {
+                'name': f"Smartcar {smartcar_user_id[:8]}",
+                'email': email,
+                'password': password,
+            }
+
+            response = self._request_with_reauth('post', url, json=payload, timeout=10)
+
+            if response.status_code == 200:
+                result = response.json()
+                traccar_user_id = result.get('id')
+                logger.info(f"✓ Created Traccar user for Smartcar user {smartcar_user_id[:8]} (Traccar ID: {traccar_user_id})")
+                logger.info(f"   Email: {email}")
+                logger.info(f"   Password: {password}  ← save this, it will not be shown again")
+                return True, f"Created user {email}", traccar_user_id
+            elif response.status_code == 409:
+                logger.warning(f"Traccar user {email} already exists")
+                return False, "User already exists", None
+            else:
+                logger.error(f"Error creating user {email}: {response.status_code} — {response.text}")
+                return False, response.text, None
+
+        except Exception as e:
+            logger.error(f"Error creating Traccar user {email}: {e}")
+            return False, str(e), None
+
+    def ensure_user(self, smartcar_user_id: str) -> Tuple[Optional[int], bool]:
+        """
+        Find or create a Traccar user for the given Smartcar user UUID.
+
+        The user is keyed by email address: {smartcar_user_id}@smartcar.local
+
+        Args:
+            smartcar_user_id: Smartcar user UUID
+
+        Returns:
+            Tuple of (traccar_user_id: int or None, was_created: bool)
+        """
+        email = f"{smartcar_user_id}@smartcar.local"
+
+        users = self.get_users()
+        for user in users:
+            if user.get('email') == email:
+                logger.debug(f"Found existing Traccar user for Smartcar user {smartcar_user_id[:8]}")
+                return user.get('id'), False
+
+        logger.info(f"No Traccar user found for Smartcar user {smartcar_user_id[:8]}, creating one...")
+        password = secrets.token_urlsafe(16)
+        success, msg, traccar_user_id = self.create_user(smartcar_user_id, email, password)
+        if success:
+            return traccar_user_id, True
+
+        logger.error(f"Failed to create Traccar user for {smartcar_user_id}: {msg}")
+        return None, False
+
+    def link_device_to_user(self, traccar_user_id: int, traccar_device_id: int) -> bool:
+        """
+        Grant a Traccar user access to a device via the permissions API.
+
+        Args:
+            traccar_user_id: Traccar user integer ID
+            traccar_device_id: Traccar device integer ID
+
+        Returns:
+            True if the link exists or was successfully created
+        """
+        if not self.authenticated:
+            if not self._authenticate():
+                return False
+
+        try:
+            url = f"{self.api_url}/api/permissions"
+            payload = {'userId': traccar_user_id, 'deviceId': traccar_device_id}
+            response = self._request_with_reauth('post', url, json=payload, timeout=10)
+
+            if response.status_code in (200, 204):
+                logger.info(f"✓ Linked Traccar device {traccar_device_id} to user {traccar_user_id}")
+                return True
+            elif response.status_code in (400, 409):
+                # Already linked or duplicate — treat as success
+                logger.debug(f"Device {traccar_device_id} already linked to user {traccar_user_id}")
+                return True
+            else:
+                logger.error(f"Error linking device {traccar_device_id} to user {traccar_user_id}: "
+                             f"{response.status_code} — {response.text}")
+                return False
+
+        except Exception as e:
+            logger.error(f"Error linking device {traccar_device_id} to user {traccar_user_id}: {e}")
+            return False
+
+    def ensure_user_device_link(self, traccar_user_id: int, device_unique_id: str) -> bool:
+        """
+        Ensure a Traccar user has access to the device identified by its uniqueId.
+
+        Looks up the device's integer Traccar ID, then calls link_device_to_user.
+
+        Args:
+            traccar_user_id: Traccar user integer ID
+            device_unique_id: Smartcar vehicle UUID used as device uniqueId
+
+        Returns:
+            True if the link was confirmed or created
+        """
+        devices = self.get_devices()
+        device = next((d for d in devices if d.get('uniqueId') == device_unique_id), None)
+
+        if device is None:
+            logger.warning(f"Cannot link user {traccar_user_id} — device {device_unique_id} not found in Traccar")
+            return False
+
+        traccar_device_id = device.get('id')
+        return self.link_device_to_user(traccar_user_id, traccar_device_id)

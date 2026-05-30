@@ -185,7 +185,8 @@ class WebhookProcessor:
             print(f"⚠️  Could not extract signals: {e}")
             return None
     
-    def process_vehicle_state_event(self, event_id: str, vehicle_id: str, signals: dict) -> bool:
+    def process_vehicle_state_event(self, event_id: str, vehicle_id: str, signals: dict,
+                                     user_id: Optional[str] = None) -> bool:
         """
         Process VEHICLE_STATE event and update Traccar.
         
@@ -193,6 +194,8 @@ class WebhookProcessor:
             event_id: Unique event identifier
             vehicle_id: Smartcar vehicle ID
             signals: Signal data from webhook
+            user_id: Smartcar user ID (optional); if provided, a Traccar account is created
+                     for the user and linked to the vehicle device.
             
         Returns:
             True if successfully processed
@@ -250,6 +253,13 @@ class WebhookProcessor:
                     if signal_data['battery_level']:
                         details += f" [batt: {signal_data['battery_level']}%]"
                     print(f"✓ Updated vehicle {vehicle_id}: {details}")
+
+                    # Ensure the Smartcar user has a Traccar account linked to this device
+                    if user_id:
+                        traccar_user_id, _ = self.traccar.ensure_user(user_id)
+                        if traccar_user_id:
+                            self.traccar.ensure_user_device_link(traccar_user_id, vehicle_id)
+
                     # Mark as processed only after successful update
                     self.mark_processed(event_id)
                     return True
@@ -274,16 +284,19 @@ class WebhookProcessor:
         try:
             event_id = payload.get('eventId')
             event_type = payload.get('eventType')
-            vehicle_id = payload['data']['vehicle']['id']
+            data = payload.get('data', {})
+            vehicle_id = data['vehicle']['id']
+            user_id = data.get('user', {}).get('id')
             
             print(f"\n📡 Webhook received:")
             print(f"   Event: {event_type}")
             print(f"   Vehicle: {vehicle_id}")
+            print(f"   User: {user_id or 'unknown'}")
             print(f"   EventId: {event_id}")
             
             if event_type == 'VEHICLE_STATE':
-                signals = payload.get('data', {}).get('signals', {})
-                return self.process_vehicle_state_event(event_id, vehicle_id, signals)
+                signals = data.get('signals', {})
+                return self.process_vehicle_state_event(event_id, vehicle_id, signals, user_id=user_id)
             
             elif event_type == 'VEHICLE_ERROR':
                 print(f"⚠️  Vehicle error: {payload['data']['error']}")

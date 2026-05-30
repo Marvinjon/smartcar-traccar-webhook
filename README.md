@@ -10,8 +10,10 @@ Smartcar API
 Webhook Handler (Flask)
     ├→ Validate signature
     ├→ Check for duplicates
-    ├→ Extract location
-    └→ Send to Traccar
+    ├→ Ensure Traccar user exists (create if new customer)
+    ├→ Ensure Traccar device exists (create if new vehicle)
+    ├→ Link user to device (Traccar permissions)
+    └→ Send telemetry to Traccar
 ```
 
 ## Quick Start
@@ -101,6 +103,7 @@ Event processing and deduplication.
 - Maintains processed event IDs in `webhook_dedup.json`
 - Prevents duplicate location updates
 - Extracts latitude/longitude/odometer from signals
+- Auto-provisions Traccar user accounts (see [User Auto-Provisioning](#user-auto-provisioning))
 - Posts to Traccar API
 - Thread-safe per-vehicle processing
 
@@ -129,6 +132,37 @@ TRACCAR_API_URL=http://example.com
 TRACCAR_USERNAME=admin
 TRACCAR_PASSWORD=***
 ```
+
+## User Auto-Provisioning
+
+When a `VEHICLE_STATE` webhook arrives, the service automatically creates a Traccar account for the Smartcar user if one does not already exist, then grants that account access to the user's vehicle.
+
+### How it works
+
+1. The webhook payload includes a `data.user.id` field (a Smartcar UUID).
+2. The service looks up a Traccar user with the email `{smartcar_user_id}@smartcar.local`.
+3. If none is found, a new Traccar user is created with:
+   - **Name:** `Smartcar {first 8 chars of UUID}`
+   - **Email:** `{smartcar_user_id}@smartcar.local`
+   - **Password:** randomly generated (printed once to the server log)
+4. The user is then granted access to their vehicle's Traccar device via the permissions API.
+
+### First-time customer log output
+
+When a new customer is seen for the first time, you will see something like this in your server logs:
+
+```
+✓ Created Traccar user for Smartcar user f923e070 (Traccar ID: 42)
+   Email: f923e070-b240-48e0-9244-74e2dd0fc7b3@smartcar.local
+   Password: xK9mPqR2vLs8dNjT  ← save this, it will not be shown again
+✓ Linked Traccar device 7 to user 42
+```
+
+**Save the generated password** — it is only logged once at creation time. You can distribute it to the customer or use the Traccar admin panel to set a new one.
+
+### Subsequent webhooks
+
+After the first provisioning, `ensure_user` finds the existing user by email and skips creation. The device-to-user permission link is also idempotent (duplicate attempts are silently ignored).
 
 ## Deduplication
 
@@ -181,7 +215,7 @@ curl https://your-domain.com/webhooks/stats
 
 ### Webhook not receiving events
 
-1. **Check signature error** - Verify SMARTCAR_WEBHOOK_SECRET matches Dashboard
+1. **Check signature error** - Verify `SMARTCAR_MANAGEMENT_TOKEN` matches the token in the Smartcar Dashboard
 2. **Check domain** - Ensure domain resolves and SSL cert is valid
 3. **Check Dashboard logs** - View delivery attempts in Smartcar Dashboard
 4. **Check port** - Ensure WEBHOOK_PORT is forwarded/accessible
@@ -189,9 +223,16 @@ curl https://your-domain.com/webhooks/stats
 ### Location not updating in Traccar
 
 1. **Check Traccar auth** - Verify credentials in .env
-2. **Check vehicle ID** - Ensure Smartcar ID matches Traccar device unique ID
-3. **Check signals** - Verify Location.Latitude/Longitude are subscribed
+2. **Check vehicle ID** - Ensure Smartcar vehicle UUID appears as the device's `uniqueId` in Traccar
+3. **Check signals** - Verify location signals are subscribed in the Smartcar Dashboard webhook config
 4. **Check logs** - Look for extraction errors in webhook handler output
+
+### Traccar user not being created
+
+1. **Check Traccar credentials** - The service logs in as an admin; non-admin accounts cannot create users via the API
+2. **Check `GET /api/users`** - If this returns a 403, the configured Traccar account lacks admin privileges
+3. **Check logs** - Search for `ensure_user` or `create_user` error messages
+4. **Password not saved** - If you missed the one-time password log, use the Traccar admin panel to set a new password for the user
 
 ### Duplicate events
 
@@ -267,6 +308,8 @@ sudo systemctl status smartcar-webhook
 - ✓ Environment variable validation
 - ✓ Webhook signature verification
 - ✓ Event deduplication
+- ✓ Automatic Traccar user provisioning per customer
+- ✓ Automatic device-to-user permission linking
 
 ## Support
 
