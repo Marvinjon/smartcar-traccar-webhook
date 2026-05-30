@@ -1,1 +1,2 @@
 *.envwebhook_dedup.json
+.env
